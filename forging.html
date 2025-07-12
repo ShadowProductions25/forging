@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Forging Mini-Game</title>
+    <style>
+        body {
+            background: #111;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            user-select: none;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .orbs {
+            display: grid;
+            grid-template-columns: repeat(6, 60px);
+            grid-template-rows: repeat(6, 60px);
+            justify-content: center;
+            gap: 12px;
+            margin: 30px auto;
+            width: max-content;
+        }
+
+        .orb {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            opacity: 0.5;
+            cursor: pointer;
+            transition: opacity 0.15s ease, box-shadow 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            position: relative;
+            background-color: gray;
+        }
+
+        .glow {
+            opacity: 1;
+            box-shadow: 0 0 18px white;
+        }
+
+        svg {
+            width: 28px;
+            height: 28px;
+            stroke: white;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        #message {
+            margin: 15px 0;
+            font-size: 1.3em;
+            min-height: 1.5em;
+        }
+
+        #score {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+
+        select,
+        button {
+            font-size: 1em;
+            padding: 8px 16px;
+            margin: 10px 5px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            background: #222;
+            color: white;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Forging Mini-Game</h1>
+    <label for="dragonType">Select Dragon Type:</label>
+    <select id="dragonType">
+        <option value="red">Fire (Red)</option>
+        <option value="green">Emerald (Green)</option>
+        <option value="gray">Storm (Gray)</option>
+        <option value="purple">Mystic (Purple)</option>
+        <option value="lightblue">Ice (Light Blue)</option>
+    </select>
+    <br />
+    <button id="startBtn">Start Forging</button>
+    <button id="replayBtn" disabled>Replay Sequence</button>
+    <p id="score">Score: 0</p>
+    <p id="message"></p>
+    <div class="orbs" id="orbsContainer"></div>
+
+    <script>
+        const message = document.getElementById("message");
+        const dragonType = document.getElementById("dragonType");
+        const orbsContainer = document.getElementById("orbsContainer");
+        const startBtn = document.getElementById("startBtn");
+        const replayBtn = document.getElementById("replayBtn");
+        const scoreDisplay = document.getElementById("score");
+
+        const gridSize = 6;
+        const totalOrbs = gridSize * gridSize;
+        let sequence = [];
+        let playerInput = [];
+        let round = 0;
+        let acceptingInput = false;
+        let orbs = [];
+
+        const colorMap = {
+            red: "#d22",
+            green: "#2d8a2d",
+            gray: "#777",
+            purple: "#8844cc",
+            lightblue: "#66ccee"
+        };
+
+        // Create unique SVG symbol per orb index
+        function createSvgSymbol(id) {
+            const svgns = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgns, "svg");
+            svg.setAttribute("viewBox", "0 0 24 24");
+            svg.setAttribute("stroke", "white");
+            svg.setAttribute("stroke-width", "2");
+            svg.setAttribute("fill", "none");
+
+            const dotsCount = 1 + (id % 5);
+            const dotPositions = [
+                [12, 6],
+                [6, 12],
+                [18, 12],
+                [8, 18],
+                [16, 18]
+            ];
+            for (let i = 0; i < dotsCount; i++) {
+                const circle = document.createElementNS(svgns, "circle");
+                circle.setAttribute("cx", dotPositions[i][0]);
+                circle.setAttribute("cy", dotPositions[i][1]);
+                circle.setAttribute("r", 1.5);
+                svg.appendChild(circle);
+            }
+
+            switch (id % 6) {
+                case 0:
+                    const vline = document.createElementNS(svgns, "line");
+                    vline.setAttribute("x1", "12");
+                    vline.setAttribute("y1", "2");
+                    vline.setAttribute("x2", "12");
+                    vline.setAttribute("y2", "22");
+                    svg.appendChild(vline);
+                    break;
+                case 1:
+                    const hline = document.createElementNS(svgns, "line");
+                    hline.setAttribute("x1", "2");
+                    hline.setAttribute("y1", "12");
+                    hline.setAttribute("x2", "22");
+                    hline.setAttribute("y2", "12");
+                    svg.appendChild(hline);
+                    break;
+                case 2:
+                    const d1 = document.createElementNS(svgns, "line");
+                    d1.setAttribute("x1", "4");
+                    d1.setAttribute("y1", "4");
+                    d1.setAttribute("x2", "20");
+                    d1.setAttribute("y2", "20");
+                    svg.appendChild(d1);
+                    break;
+                case 3:
+                    const d2 = document.createElementNS(svgns, "line");
+                    d2.setAttribute("x1", "20");
+                    d2.setAttribute("y1", "4");
+                    d2.setAttribute("x2", "4");
+                    d2.setAttribute("y2", "20");
+                    svg.appendChild(d2);
+                    break;
+                case 4:
+                    const cross1 = document.createElementNS(svgns, "line");
+                    cross1.setAttribute("x1", "4");
+                    cross1.setAttribute("y1", "4");
+                    cross1.setAttribute("x2", "20");
+                    cross1.setAttribute("y2", "20");
+                    svg.appendChild(cross1);
+                    const cross2 = document.createElementNS(svgns, "line");
+                    cross2.setAttribute("x1", "20");
+                    cross2.setAttribute("y1", "4");
+                    cross2.setAttribute("x2", "4");
+                    cross2.setAttribute("y2", "20");
+                    svg.appendChild(cross2);
+                    break;
+                case 5:
+                    const square = document.createElementNS(svgns, "rect");
+                    square.setAttribute("x", "6");
+                    square.setAttribute("y", "6");
+                    square.setAttribute("width", "12");
+                    square.setAttribute("height", "12");
+                    svg.appendChild(square);
+                    break;
+            }
+
+            const polygon = document.createElementNS(svgns, "polygon");
+            const rotations = [
+                "12,4 20,20 4,20",
+                "4,4 20,12 4,20",
+                "12,20 20,4 4,4",
+                "20,4 12,20 20,20"
+            ];
+            polygon.setAttribute("points", rotations[id % 4]);
+            svg.appendChild(polygon);
+
+            return svg;
+        }
+
+        function generateOrbs() {
+            orbsContainer.innerHTML = "";
+            orbs = [];
+            const selectedColor = colorMap[dragonType.value] || "#777";
+
+            for (let i = 0; i < totalOrbs; i++) {
+                const orb = document.createElement("div");
+                orb.classList.add("orb");
+                orb.dataset.index = i;
+                orb.dataset.color = selectedColor;
+
+                orb.style.backgroundColor = selectedColor;
+                orb.style.opacity = "0.5";
+
+                orb.innerHTML = "";
+                orb.appendChild(createSvgSymbol(i));
+
+                orbsContainer.appendChild(orb);
+                orbs.push(orb);
+            }
+        }
+
+        function sleep(ms) {
+            return new Promise(res => setTimeout(res, ms));
+        }
+
+        // Glow orb with slower glow & pause, gradually speeding but gently
+        async function glowOrb(orb) {
+            orb.classList.add("glow");
+            orb.style.opacity = "1";
+            // Glow duration starts at 550ms, decreases slowly with round, min 300ms
+            const glowTime = Math.max(300, 550 - round * 15);
+            await sleep(glowTime);
+            orb.classList.remove("glow");
+            orb.style.opacity = "0.5";
+            // Pause duration starts at 250ms, min 150ms
+            const pauseTime = Math.max(150, 250 - round * 10);
+            await sleep(pauseTime);
+        }
+
+        async function glowSequence() {
+            startBtn.disabled = true;
+            replayBtn.disabled = true;
+            for (let idx of sequence) {
+                await glowOrb(orbs[idx]);
+            }
+            acceptingInput = true;
+            message.textContent = `Round ${round}: Your turn to repeat the sequence.`;
+            replayBtn.disabled = false;
+        }
+
+        // Cap max sequence length based on round to keep it short early on
+        function maxSequenceLength() {
+            if (round < 3) return 3;
+            if (round < 6) return 5;
+            if (round < 10) return 7;
+            return 10; // max cap
+        }
+
+        function addToSequence() {
+            if (sequence.length >= maxSequenceLength()) {
+                // Don't increase sequence length beyond max cap this round
+                return;
+            }
+            const randomIndex = Math.floor(Math.random() * totalOrbs);
+            sequence.push(randomIndex);
+        }
+
+        function checkInput(clickedIndex) {
+            if (!acceptingInput) return;
+            playerInput.push(clickedIndex);
+            const currentIndex = playerInput.length - 1;
+            if (playerInput[currentIndex] !== sequence[currentIndex]) {
+                endGame("Forge Failed — The core cracked.");
+                return;
+            }
+            if (playerInput.length === sequence.length) {
+                updateScore(round);
+                nextRound();
+            }
+        }
+
+        function nextRound() {
+            round++;
+            playerInput = [];
+            addToSequence();
+            message.textContent = `Round ${round}: Watch the sequence.`;
+            acceptingInput = false;
+            setTimeout(() => glowSequence(), 1200);
+        }
+
+        function updateScore(newScore) {
+            scoreDisplay.textContent = `Score: ${newScore}`;
+        }
+
+        function startGame() {
+            sequence = [];
+            playerInput = [];
+            round = 0;
+            updateScore(0);
+            message.textContent = "Get ready...";
+            startBtn.disabled = true;
+            replayBtn.disabled = true;
+            generateOrbs();
+            setTimeout(() => {
+                nextRound();
+            }, 3000);
+        }
+
+        function endGame(msg) {
+            message.textContent = msg + ` You reached round ${round}.`;
+            acceptingInput = false;
+            startBtn.disabled = false;
+            replayBtn.disabled = true;
+        }
+
+        orbsContainer.addEventListener("click", e => {
+            if (e.target.closest(".orb") && acceptingInput) {
+                const orb = e.target.closest(".orb");
+                const clickedIndex = Number(orb.dataset.index);
+                checkInput(clickedIndex);
+            }
+        });
+
+        replayBtn.addEventListener("click", () => {
+            if (!acceptingInput) return;
+            acceptingInput = false;
+            message.textContent = `Round ${round}: Watch the sequence again.`;
+            replayBtn.disabled = true;
+            glowSequence();
+        });
+
+        dragonType.addEventListener("change", () => {
+            if (!acceptingInput) generateOrbs();
+        });
+
+        generateOrbs();
+
+        startBtn.addEventListener("click", startGame);
+    </script>
+</body>
+
+</html>
